@@ -4,7 +4,8 @@ import {View, WebView, Platform, ViewStylePropTypes} from 'react-native';
 import Bus from './Bus';
 import {webviewTarget, webviewProperties, webviewMethods, constructors, WEBVIEW_TARGET} from './webview-binders';
 import CanvasRenderingContext2D from './CanvasRenderingContext2D';
-import html from './index.html.js';
+import baseHtml from './index.html.js';
+import injectStylesToHtml from './injectStylesToHtml';
 export {default as Image} from './Image';
 export {default as ImageData} from './ImageData';
 export {default as Path2D} from './Path2D';
@@ -112,7 +113,15 @@ export default class Canvas extends Component {
 
   render() {
     const {width, height} = this;
-    const {style, baseUrl = '', originWhitelist = ['*']} = this.props;
+    const {
+      style,
+      baseUrl = '',
+      originWhitelist = ['*'],
+      htmlStyleTegContent
+    } = this.props;
+
+    const html = injectStylesToHtml(baseHtml, htmlStyleTegContent);
+
     if (Platform.OS === 'android') {
       return (
         <View style={{width, height, overflow: 'hidden', flex: 0, ...style}}>
