@@ -1,5 +1,5 @@
 {
-  "name": "@hirurgo/react-native-canvas",
+  "name": "@eventsPortal/react-native-canvas",
   "license": "MIT",
   "version": "0.1.26",
   "main": "dist/Canvas.js",
