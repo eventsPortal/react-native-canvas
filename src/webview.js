@@ -5,16 +5,27 @@ const ID = () =>
     .toString(32)
     .slice(2);
 
+const flattenObjectCopyValue = (flatObj, srcObj, key) => {
+  const value = srcObj[key];
+  if (typeof value === 'function') {
+    return;
+  }
+  if (typeof value === 'object' && value instanceof Node) {
+    return;
+  }
+  flatObj[key] = flattenObject(value);
+};
+
 const flattenObject = object => {
-  if (typeof object !== 'object') {
+  if (typeof object !== 'object' || object === null) {
     return object;
   }
   const flatObject = {};
   for (const key in object) {
-    flatObject[key] = object[key];
+    flattenObjectCopyValue(flatObject, object, key);
   }
   for (const key in Object.getOwnPropertyNames(object)) {
-    flatObject[key] = object[key];
+    flattenObjectCopyValue(flatObject, object, key);
   }
   return flatObject;
 };
@@ -132,22 +143,22 @@ const toArgs = result => {
 const createObjectsFromArgs = args => {
   for (let index = 0; index < args.length; index += 1) {
     const currentArg = args[index];
-    if (currentArg.className !== undefined) {
+    if (currentArg && currentArg.className !== undefined) {
       const {className, classArgs} = currentArg;
-      const constructor = new constructors[className](...classArgs);
-      args[index] = constructor;
+      const object = new constructors[className](...classArgs);
+      args[index] = object;
     }
   }
   return args;
 };
 
-// const print = (...args) => {
-//   const a = JSON.stringify({
-//     type: 'log',
-//     payload: args,
-//   });
-//   postMessage(a);
-// };
+const print = (...args) => {
+  const message = JSON.stringify({
+    type: 'log',
+    payload: args,
+  });
+  window.ReactNativeWebView.postMessage(message);
+};
 
 const canvas = document.createElement('canvas');
 const autoScaledCanvas = new AutoScaledCanvas(canvas);
@@ -224,7 +235,7 @@ function handleMessage({id, type, payload}) {
           }
         }
       }
-      postMessage(JSON.stringify({id, ...message}));
+      window.ReactNativeWebView.postMessage(JSON.stringify({id, ...message}));
       break;
     }
     case 'set': {
@@ -235,11 +246,16 @@ function handleMessage({id, type, payload}) {
     case 'construct': {
       const {constructor, id: target, args = []} = payload;
       const newArgs = createObjectsFromArgs(args);
-      const object = new constructors[constructor](...newArgs);
+      let object;
+      try {
+        object = new constructors[constructor](...newArgs);
+      } catch (error) {
+        throw new Error(`Error while constructing ${constructor} ${error.message}`);
+      }
       object.__constructorName__ = constructor;
       const message = toMessage({});
       targets[target] = object;
-      postMessage(JSON.stringify({id, ...message}));
+      window.ReactNativeWebView.postMessage(JSON.stringify({id, ...message}));
       break;
     }
     case 'listen': {
@@ -253,7 +269,7 @@ function handleMessage({id, type, payload}) {
               target: {...flattenObject(targets[target]), [WEBVIEW_TARGET]: target},
             },
           });
-          postMessage(JSON.stringify({id, ...message}));
+          window.ReactNativeWebView.postMessage(JSON.stringify({id, ...message}));
         });
       }
       break;
@@ -262,12 +278,13 @@ function handleMessage({id, type, payload}) {
 }
 
 const handleError = (err, message) => {
-  postMessage(
+  window.ReactNativeWebView.postMessage(
     JSON.stringify({
       id: message.id,
       type: 'error',
       payload: {
         message: err.message,
+        stack: err.stack,
       },
     }),
   );
@@ -293,4 +310,7 @@ function handleIncomingMessage(e) {
   }
 }
 
+// iOS
+window.addEventListener('message', handleIncomingMessage);
+// Android
 document.addEventListener('message', handleIncomingMessage);
